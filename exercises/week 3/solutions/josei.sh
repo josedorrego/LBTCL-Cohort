@@ -1,6 +1,18 @@
 #!/bin/bash
 # Week #3
 
+# Restart node script I was using in a separate file
+:'
+bitcoin-cli stop
+sleep 1
+rm -rf /home/jose/.bitcoin/regtest/*
+bitcoind -daemon
+sleep 5
+'
+
+# End of node "restarting"
+
+
 echo "Create three wallets: Miner, Alice, and Bob."
 bitcoin-cli -named createwallet wallet_name="Miner" descriptors=false >/dev/null
 bitcoin-cli -named createwallet wallet_name="Alice" descriptors=false >/dev/null
@@ -134,8 +146,12 @@ newSignedPSBTHex=$(bitcoin-cli finalizepsbt $bothNewPSBT | jq -r '.hex')
 #do not use the wallet here. Just bitcoin-cli sendrawtransaction. For some reason using wallet will fail to broadcast.
 #
 #bitcoin-cli -rpcwallet=Alice sendrawtransaction hexstring=$newSignedPSBTHex
-bitcoin-cli sendrawtransaction hexstring=$newSignedPSBTHex
+bitcoin-cli sendrawtransaction $newSignedPSBTHex > /dev/null
 
+
+#mining one more block in order to see the transaction reflected in Alice's and Bob's wallet
+minerAddress=$(bitcoin-cli -rpcwallet=Miner getnewaddress "Miner address" )
+bitcoin-cli generatetoaddress 1 $minerAddress > /dev/null
 
 
 echo "Alice's balance: " 
