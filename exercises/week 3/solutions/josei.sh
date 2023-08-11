@@ -102,20 +102,39 @@ bobReturnAddress=$(bitcoin-cli -rpcwallet=Bob getnewaddress "Bob return address"
 #Create new PSBT TX
 newpsbt=$(bitcoin-cli -named createpsbt inputs='''[ { "txid": "'$multisigTXID'", "vout": '$multisigVout' } ]''' outputs='''{ "'$aliceReturnAddress'": 9.999998, "'$bobReturnAddress'": 9.999998 }''')
 
+
+#Instead of individually signing the psbt, chain the signing process.
+#
+#    Sign by Alice first. Get the signed .psbt.
+#    Use the same psbt and sign it by BOB.
+
 echo "#Get Alice to sign"
 aliceNewPSBT=$(bitcoin-cli -rpcwallet=Alice walletprocesspsbt $newpsbt | jq -r '.psbt')
 bitcoin-cli analyzepsbt $aliceNewPSBT
 echo "#Get Bob to sign"
-bobNewPSBT=$(bitcoin-cli -rpcwallet=Bob walletprocesspsbt $newpsbt | jq -r '.psbt')
-bitcoin-cli analyzepsbt $bobNewPSBT
-echo "#Join signatures"
-#newSignedPSBT=$(bitcoin-cli -rpcwallet=Alice combinepsbt '''["'$aliceNewPSBT'", "'$bobNewPSBT'"]''')
-newSignedPSBT=$(bitcoin-cli combinepsbt '''["'$aliceNewPSBT'", "'$bobNewPSBT'"]''')
+bothNewPSBT=$(bitcoin-cli -rpcwallet=Bob walletprocesspsbt $aliceNewPSBT | jq -r '.psbt')
+
+
+#
+#In the above process no need to join the two psbts again. Bob's signed psbt output will be the final psbt.
+#
+
+#echo "#Join signatures"
+#newSignedPSBT=$(bitcoin-cli combinepsbt '''["'$aliceNewPSBT'", "'$bobNewPSBT'"]''')
 #bitcoin-cli decodepsbt $newSignedPSBT
-bitcoin-cli analyzepsbt $newSignedPSBT
+#bitcoin-cli analyzepsbt $newSignedPSBT
+bitcoin-cli analyzepsbt $bothNewPSBT
+echo "--------------------------------------------------"
 echo "#Finalize and Send New Signed PSBT" 
-newSignedPSBTHex=$(bitcoin-cli finalizepsbt $newSignedPSBT | jq -r '.hex')
-bitcoin-cli -rpcwallet=Alice sendrawtransaction hexstring=$newSignedPSBTHex
+echo "--------------------------------------------------"
+newSignedPSBTHex=$(bitcoin-cli finalizepsbt $bothNewPSBT | jq -r '.hex')
+
+
+#
+#do not use the wallet here. Just bitcoin-cli sendrawtransaction. For some reason using wallet will fail to broadcast.
+#
+#bitcoin-cli -rpcwallet=Alice sendrawtransaction hexstring=$newSignedPSBTHex
+bitcoin-cli sendrawtransaction hexstring=$newSignedPSBTHex
 
 
 
